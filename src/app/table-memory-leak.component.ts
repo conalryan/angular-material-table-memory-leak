@@ -1,30 +1,7 @@
-# Angular Material
-
-## 1. Install Angular CLI
-
-```bash
-npm install -g @angular/cli
-```
-
-## 2. Create a new Angular project
-
-```bash
-ng new angular-material-table-memory-leak --style=scss
-```
-
-## 3. Install Angular Material
-
-```bash
-ng add @angular/material
-```
-
-## 4. Create a table that polls data from an API
-
-```ts
 import { CdkTableModule } from '@angular/cdk/table';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
-import { map, Observable, tap, timer } from 'rxjs';
+import { map, Observable, Subject, takeUntil, tap, timer } from 'rxjs';
 
 export interface SimpleData {
   id: number;
@@ -44,7 +21,7 @@ export const SIMPLE_DATA: SimpleData[] = [
   imports: [CdkTableModule],
   template: `
     <h3>Table Memory Leak</h3>
-    <table cdk-table [dataSource]="dataSource">
+    <table cdk-table [dataSource]="dataSource" [trackBy]="trackByFn">
       <ng-container cdkColumnDef="id">
         <th cdk-header-cell *cdkHeaderCellDef>ID</th>
         <td cdk-cell *cdkCellDef="let row">{{ row.id }}</td>
@@ -67,14 +44,20 @@ export const SIMPLE_DATA: SimpleData[] = [
     }
   `,
 })
-export class TableMemoryLeakComponent implements OnInit {
+export class TableMemoryLeakComponent implements OnInit, OnDestroy {
   displayedColumns: string[] = ['id', 'name'];
   dataSource = new MatTableDataSource<SimpleData>();
-  
+  #unsubscribe$ = new Subject<void>();
+
   ngOnInit() {
     this.#poll().subscribe((res) => {
       this.dataSource.data = res;
     });
+  }
+
+  ngOnDestroy() {
+    this.#unsubscribe$.next();
+    this.#unsubscribe$.complete();
   }
 
   trackByFn(index: number, item: SimpleData) {
@@ -83,53 +66,15 @@ export class TableMemoryLeakComponent implements OnInit {
 
   #poll(ms = 2500): Observable<SimpleData[]> {
     // Simulating periodic refreshes (every few seconds the REST endpoint can be executed to update the view without user refreshing)
-    return timer(0,ms).pipe(
+    return timer(0, ms).pipe(
       /**
        * This is just to simulate creating new JS objects.
        * This is the case when you have here a REST call to backend.
        * Without that, Angular just knows this is exactly the same JS object, so it won't repaint anything.
        */
-      tap(_ => console.log('[table-service]::fetch')),
-      map(_ => JSON.parse(JSON.stringify(SIMPLE_DATA))));
+      tap((_) => console.log('[table-service]::fetch')),
+      map((_) => JSON.parse(JSON.stringify(SIMPLE_DATA))),
+      takeUntil(this.#unsubscribe$)
+    );
   }
 }
-```
-
-## 5. Run the application
-
-```bash
-npm run start
-```
-
-## 6. Take some memory snapshots
-
-Note the number of Detached DOM nodes grows over time (i.e. Detached <tr>)
-
-![Memory snapshot 1](./detached-1.jpg)
-
-![Memory snapshot 2](./detached-2.jpg)
-
-## 6. Add trackByFn
-
-```html
-<table cdk-table [dataSource]="dataSource" [trackBy]="trackByFn">
-```
-
-```ts
-trackByFn(index: number, item: SimpleData) {
-  return item.id;
-}
-```
-
-## 7. Run the application
-
-```bash
-npm run start
-```
-
-Note the there are no Detached <tr> nodes.
-
-![Memory snapshot 3](./detached-3.jpg)
-
-![Memory snapshot 4](./detached-4.jpg)
-

@@ -4,9 +4,9 @@ import { RouterOutlet } from '@angular/router';
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  template: `
+    <h3>Angular V19 Material</h3>
+    <router-outlet />
+  `,
 })
-export class AppComponent {
-  title = 'angular-v19-mat';
-}
+export class AppComponent {}
